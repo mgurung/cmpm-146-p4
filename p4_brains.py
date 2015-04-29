@@ -47,13 +47,99 @@ class SlugBrain:
 
   def __init__(self, body):
     self.body = body
+    self.state = 'idle'
+    self.have_resource = False
 
 
   def handle_event(self, message, details):
     # TODO: IMPLEMENT THIS METHOD
     #  (Use helper methods and classes to keep your code organized where
     #  approprioate.)
-    pass    
+
+    #Movement command check
+    if message == 'order' and type(details) == tuple:
+      self.body.go_to(details)
+
+    #Keyboard command check
+    else:
+      if details == 'i':
+        self.state = 'idle'
+        self.body.stop()
+      elif details == 'a':
+        self.state = 'attack'
+        nearest_mantis = self.body.find_nearest('Mantis')
+        self.body.follow(nearest_mantis)
+        self.body.set_alarm(1)
+      elif details == 'h':
+        self.state = 'harvest'
+        if self.have_resource:
+          nearest_nest = self.body.find_nearest('Nest')
+          self.body.go_to(nearest_nest)
+        else:
+          nearest_resource = self.body.find_nearest('Resource')
+          self.body.go_to(nearest_resource)
+        self.body.set_alarm(0.5)
+
+      elif details == 'b':
+        self.state = 'build'
+        nearest_nest = self.body.find_nearest('Nest')
+        self.body.go_to(nearest_nest)
+
+    #Flee check
+    if self.body.amount < 0.5:
+      nearest_nest = self.body.find_nearest('Nest')
+      self.body.go_to(nearest_nest)
+      self.state = 'flee'
+      self.body.set_alarm(1)
+
+    #Timer check
+    if message == 'timer' and details == None:
+      if self.state == 'attack':
+        nearest_mantis = self.body.find_nearest('Mantis')
+        self.body.follow(nearest_mantis)
+        self.body.set_alarm(1)
+
+      if self.state == 'harvest':
+        if self.have_resource:
+          nearest_nest = self.body.find_nearest('Nest')
+          self.body.go_to(nearest_nest)
+        else:
+          nearest_resource = self.body.find_nearest('Resource')
+          self.body.go_to(nearest_resource)
+        self.body.set_alarm(0.5)
+
+      if self.state == 'flee':
+        nearest_nest = self.body.find_nearest('Nest')
+        self.body.go_to(nearest_nest)
+        self.body.set_alarm(1)
+
+    #Collision check
+    if message == 'collide':
+      if details['what'] == 'Mantis':
+        mantis = details['who']
+        if self.state == 'attack':
+          mantis.amount -= 0.05
+
+      if details['what'] == 'Resource':
+        resource = details['who']
+        if self.state == 'harvest' and not self.have_resource:
+          resource.amount -= 0.25
+          self.have_resource = True
+
+      if details['what'] == 'Nest':
+        nest = details['who']
+        if self.state == 'build':
+          nest.amount += 0.01
+        if self.state == 'harvest':
+          self.have_resource = False
+        if self.state == 'flee':
+          self.body.amount = 1.0
+          self.state = 'attack'
+          self.body.set_alarm(1)
+
+
+
+
 
 world_specification = {
   'worldgen_seed': 13, # comment-out to randomize
